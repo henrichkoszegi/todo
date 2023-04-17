@@ -4,13 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Events\TodoCompleted;
 use App\Events\TodoShared;
+use App\Http\Requests\IndexTodoRequest;
+use App\Http\Requests\StoreTodoRequest;
+use App\Http\Requests\UpdateTodoRequest;
 use App\Models\Category;
 use App\Models\Todo;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,13 +21,9 @@ class TodoController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request): Response
+    public function index(IndexTodoRequest $request): Response
     {
-        $request->validate([
-            'category_id' => ['nullable', 'exists:categories,id'],
-            'is_completed' => ['nullable', 'boolean'],
-            'ownership' => ['nullable', 'in:own,shared'],
-        ]);
+        $categories = Category::all(['id', 'name']);
 
         $filters = [
             'category_id' => $request->query('category_id'),
@@ -33,18 +31,16 @@ class TodoController extends Controller
             'ownership' => $request->query('ownership'),
         ];
 
-        $categories = Category::all(['id', 'name']);
-
         $todos = Todo::query()
             ->with([
                 'category:id,name',
                 'shares:id,name',
                 'user:id,name',
             ])
-            ->when(!is_null($filters['category_id']), function (Builder $query) use ($filters) {
+            ->when(! is_null($filters['category_id']), function (Builder $query) use ($filters) {
                 $query->where('category_id', '=', (int) $filters['category_id']);
             })
-            ->when(!is_null($filters['is_completed']), function (Builder $query) use ($filters) {
+            ->when(! is_null($filters['is_completed']), function (Builder $query) use ($filters) {
                 $query->where('is_completed', '=', (bool) $filters['is_completed']);
             });
 
@@ -61,11 +57,7 @@ class TodoController extends Controller
 
         $todos = $todos->latest()->paginate(5)->withQueryString();
 
-        return Inertia::render('Todos/Index', [
-            'categories' => $categories,
-            'filters' => $filters,
-            'todos' => $todos,
-        ]);
+        return Inertia::render('Todos/Index', compact(['categories', 'filters', 'todos']));
     }
 
     /**
@@ -77,50 +69,25 @@ class TodoController extends Controller
 
         $users = User::whereNot('id', $request->user()->id)->get(['id', 'name']);
 
-        return Inertia::render('Todos/Create', [
-            'categories' => $categories,
-            'users' => $users,
-        ]);
+        return Inertia::render('Todos/Create', compact(['categories', 'users']));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(StoreTodoRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:32'],
-            'description' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['required', 'exists:categories,id'],
-            'shares' => ['array'],
-            'shares.*' => ['nullable', 'distinct', 'exists:users,id', Rule::notIn([$request->user()->id])],
-        ]);
+        $validated = $request->validated();
 
         $todo = $request->user()->todos()->create($validated);
 
-        $todo->shares()->sync($validated['shares']);
-
         if (count($validated['shares']) > 0) {
+            $todo->shares()->sync($validated['shares']);
+
             TodoShared::dispatch($todo);
         }
 
         return redirect(route('todos.index'))->with('success', 'Todo created.');
-    }
-
-    public function markCompleted(Request $request, Todo $todo): RedirectResponse
-    {
-        if ($request->user()->id !== $todo->user_id && is_null($todo->shares()->find($request->user()->id))) {
-            return redirect(route('todos.index'))
-                ->with('error', 'You are not the owner of this todo, neither is it shared with you.');
-        }
-
-        $todo->update([
-            'is_completed' => true,
-        ]);
-
-        TodoCompleted::dispatch($todo);
-
-        return redirect()->back()->with('success', 'Todo completed.');
     }
 
     /**
@@ -128,7 +95,7 @@ class TodoController extends Controller
      */
     public function edit(Request $request, Todo $todo): Response | RedirectResponse
     {
-        if ($request->user()->id !== $todo->user_id) {
+        if ($request->user()->cannot('update', $todo)) {
             return redirect(route('todos.index'))->with('error', 'Not authorized to edit todo.');
         }
 
@@ -138,29 +105,19 @@ class TodoController extends Controller
 
         $users = User::whereNot('id', $request->user()->id)->get(['id', 'name']);
 
-        return Inertia::render('Todos/Edit', [
-            'categories' => $categories,
-            'todo' => $todo,
-            'users' => $users,
-        ]);
+        return Inertia::render('Todos/Edit', compact(['categories', 'todo', 'users']));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Todo $todo): RedirectResponse
+    public function update(UpdateTodoRequest $request, Todo $todo): RedirectResponse
     {
-        if ($request->user()->id !== $todo->user_id) {
+        if ($request->user()->cannot('update', $todo)) {
             return redirect(route('todos.index'))->with('error', 'Not authorized to update todo.');
         }
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:32'],
-            'description' => ['nullable', 'string', 'max:255'],
-            'category_id' => ['required', 'exists:categories,id'],
-            'shares' => ['array'],
-            'shares.*' => ['nullable', 'distinct', 'exists:users,id', Rule::notIn([$request->user()->id])],
-        ]);
+        $validated = $request->validated();
 
         $todo->update($validated);
 
@@ -170,7 +127,7 @@ class TodoController extends Controller
             TodoShared::dispatch($todo);
         }
 
-        return redirect(route('todos.index'))->with('success', 'Todo updated.');;
+        return redirect(route('todos.index'))->with('success', 'Todo updated.');
     }
 
     /**
@@ -178,7 +135,7 @@ class TodoController extends Controller
      */
     public function destroy(Request $request, Todo $todo): RedirectResponse
     {
-        if ($request->user()->id !== $todo->user_id) {
+        if ($request->user()->cannot('delete', $todo)) {
             return redirect(route('todos.index'))->with('error', 'Not authorized to delete todo.');
         }
 
@@ -192,12 +149,30 @@ class TodoController extends Controller
      */
     public function restore(Request $request, Todo $todo): RedirectResponse
     {
-        if ($request->user()->id !== $todo->user_id) {
+        if ($request->user()->cannot('restore', $todo)) {
             return redirect(route('todos.index'))->with('error', 'Not authorized to restore todo.');
         }
 
         $todo->restore();
 
         return redirect()->back()->with('success', 'Todo restored.');
+    }
+
+    /**
+     * Mark the specified resource as completed.
+     */
+    public function markCompleted(Request $request, Todo $todo): RedirectResponse
+    {
+        if ($request->user()->cannot('markCompleted', $todo)) {
+            return redirect(route('todos.index'))->with('error', 'Not authorized to mark todo as completed.');
+        }
+
+        $todo->update([
+            'is_completed' => true,
+        ]);
+
+        TodoCompleted::dispatch($todo);
+
+        return redirect()->back()->with('success', 'Todo completed.');
     }
 }
