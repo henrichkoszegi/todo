@@ -26,9 +26,10 @@ class TodoController extends Controller
         $categories = Category::all(['id', 'name']);
 
         $filters = [
-            'category_id' => $request->query('category_id'),
-            'is_completed' => $request->query('is_completed'),
-            'ownership' => $request->query('ownership'),
+            'search' => $request->query('search', ''),
+            'category_id' => $request->query('category_id', ''),
+            'is_completed' => $request->query('is_completed', ''),
+            'ownership' => $request->query('ownership', ''),
         ];
 
         $todos = Todo::query()
@@ -37,10 +38,13 @@ class TodoController extends Controller
                 'shares:id,name',
                 'user:id,name',
             ])
-            ->when(! is_null($filters['category_id']), function (Builder $query) use ($filters) {
+            ->when($filters['search'] !== '', function (Builder $query) use ($filters) {
+                $query->where('name', 'like', '%' . $filters['search'] . '%');
+            })
+            ->when($filters['category_id'] !== '', function (Builder $query) use ($filters) {
                 $query->where('category_id', '=', (int) $filters['category_id']);
             })
-            ->when(! is_null($filters['is_completed']), function (Builder $query) use ($filters) {
+            ->when($filters['is_completed'] !== '', function (Builder $query) use ($filters) {
                 $query->where('is_completed', '=', (bool) $filters['is_completed']);
             });
 

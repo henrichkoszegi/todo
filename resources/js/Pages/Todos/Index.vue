@@ -6,15 +6,30 @@ import Pagination from '@/Components/Pagination.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import { reactive, watch } from 'vue';
 import FlashMessage from '@/Components/FlashMessage.vue';
+import TextInput from '@/Components/TextInput.vue';
 
 const props = defineProps(['categories', 'filters', 'todos']);
 
-const filters = reactive(props.filters ?? {});
+const filters = reactive({
+    search: props.filters.search,
+    category_id: props.filters.category_id,
+    is_completed: props.filters.is_completed,
+    ownership: props.filters.ownership,
+});
 
-watch(filters, (value) => {
-    router.get(route('todos.index'), value, {
+watch(filters, (newValue) => {
+    const params = {};
+
+    for (const key in newValue) {
+        if (newValue[key] !== '') {
+            params[key] = newValue[key];
+        }
+    }
+
+    router.get(route('todos.index'), params, {
         replace: true,
         preserveState: true,
+        preserveScroll: true,
     });
 });
 </script>
@@ -38,6 +53,17 @@ watch(filters, (value) => {
                     <div class="mb-4 text-gray-900 font-semibold uppercase">Filters</div>
                     <div class="flex gap-4">
                         <div class="px-4 py-2 bg-gray-50 border rounded-lg">
+                            <InputLabel for="category_id" value="Search" />
+
+                            <TextInput
+                                type="text"
+                                id="search"
+                                v-model="filters.search"
+                                autocomplete="off"
+                            />
+                        </div>
+
+                        <div class="px-4 py-2 bg-gray-50 border rounded-lg">
                             <InputLabel for="category_id" value="Category" />
 
                             <select
@@ -45,7 +71,7 @@ watch(filters, (value) => {
                                 class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm"
                                 v-model="filters.category_id"
                             >
-                                <option :value="null">All</option>
+                                <option value="">All</option>
                                 <option
                                     v-for="category in categories"
                                     :value="category.id"
@@ -63,7 +89,7 @@ watch(filters, (value) => {
                                 class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm"
                                 v-model="filters.is_completed"
                             >
-                                <option :value="null">All</option>
+                                <option value="">All</option>
                                 <option value="0">Not Completed</option>
                                 <option value="1">Completed</option>
                             </select>
@@ -77,7 +103,7 @@ watch(filters, (value) => {
                                 class="mt-1 block w-full border-gray-300 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md shadow-sm"
                                 v-model="filters.ownership"
                             >
-                                <option :value="null">All</option>
+                                <option value="">All</option>
                                 <option value="own">Own</option>
                                 <option value="shared">Shared with me</option>
                             </select>
