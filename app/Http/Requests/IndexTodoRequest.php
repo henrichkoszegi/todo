@@ -22,6 +22,7 @@ class IndexTodoRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'search' => ['nullable', 'string'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'is_completed' => ['nullable', 'boolean'],
             'ownership' => ['nullable', 'in:own,shared'],
