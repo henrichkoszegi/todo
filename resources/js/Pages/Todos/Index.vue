@@ -53,7 +53,7 @@ watch(filters, (newValue) => {
                     <div class="mb-4 text-gray-900 font-semibold uppercase">Filters</div>
                     <div class="flex gap-4">
                         <div class="px-4 py-2 bg-gray-50 border rounded-lg">
-                            <InputLabel for="category_id" value="Search" />
+                            <InputLabel for="search" value="Search" />
 
                             <TextInput
                                 type="text"
@@ -113,7 +113,7 @@ watch(filters, (newValue) => {
 
                 <div
                     v-if="todos.total > 0"
-                    class="mb-6 bg-white shadow-sm rounded-lg divide-y"
+                    class="mb-6 bg-white shadow-sm rounded-lg divide-y overflow-hidden"
                 >
                     <Todo
                         v-for="todo in todos.data"
