@@ -6,6 +6,10 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import FlashMessage from '@/Components/FlashMessage.vue';
+import Modal from '@/Components/Modal.vue';
+import { ref } from 'vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import DangerButton from '@/Components/DangerButton.vue';
 
 const props = defineProps(['categories', 'todo', 'users']);
 
@@ -16,12 +20,16 @@ const form = useForm({
     shares: props.todo.shares.map(share => share.id),
 });
 
+const showingDeleteTodoConfirmationModal = ref(false);
+
 const deleteTodoForm = useForm({});
 
 function handleDeleteTodo(id) {
-    if (!confirm('Are you sure?')) return;
-
-    deleteTodoForm.delete(route('todos.destroy', id));
+    deleteTodoForm.delete(route('todos.destroy', id), {
+        onFinish: () => {
+            showingDeleteTodoConfirmationModal.value = false;
+        }
+    });
 }
 
 const restoreTodoForm = useForm({});
@@ -128,14 +136,43 @@ function handleRestoreTodo(id) {
                                     Save
                                 </PrimaryButton>
 
-                                <PrimaryButton
+                                <DangerButton
                                     v-if="!todo.deleted_at"
                                     type="button"
-                                    :disabled="deleteTodoForm.processing"
-                                    @click="handleDeleteTodo(todo.id)"
+                                    @click="showingDeleteTodoConfirmationModal = true"
                                 >
                                     Delete
-                                </PrimaryButton>
+                                </DangerButton>
+
+                                <Modal
+                                    :show="showingDeleteTodoConfirmationModal"
+                                    @close="showingDeleteTodoConfirmationModal = false"
+                                >
+                                    <div class="p-6">
+                                        <h2 class="text-lg font-medium text-gray-900">
+                                            Are you sure you want to delete this todo?
+                                        </h2>
+
+                                        <div class="mt-6 flex justify-end gap-3">
+                                            <SecondaryButton
+                                                type="button"
+                                                @click="showingDeleteTodoConfirmationModal = false"
+                                            >
+                                                Cancel
+                                            </SecondaryButton>
+
+                                            <PrimaryButton
+                                                type="button"
+                                                :class="{ 'opacity-25': deleteTodoForm.processing }"
+                                                :disabled="deleteTodoForm.processing"
+                                                @click="handleDeleteTodo(todo.id)"
+                                            >
+                                                Delete
+                                            </PrimaryButton>
+                                        </div>
+                                    </div>
+
+                                </Modal>
                             </div>
                         </form>
                     </section>

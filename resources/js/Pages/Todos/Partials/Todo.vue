@@ -1,20 +1,27 @@
 <script setup>
 import { Link, useForm } from '@inertiajs/vue3';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
+import SecondaryButton from '@/Components/SecondaryButton.vue';
+import Modal from '@/Components/Modal.vue';
+import { ref } from 'vue';
 
 defineProps(['todo']);
+
+const showingMarkCompletedConfirmationModal = ref(false);
 
 const markCompletedForm = useForm({});
 
 function handleMarkCompleted(id) {
-    if (!confirm('Are you sure?')) return;
-
-    markCompletedForm.patch(route('todos.mark-completed', id));
+    markCompletedForm.patch(route('todos.mark-completed', id), {
+        onFinish: () => {
+            showingMarkCompletedConfirmationModal.value = false;
+        }
+    });
 }
 </script>
 
 <template>
-    <div class="p-6 flex items-center justify-between gap-6 space-x-2">
+    <div :class="['p-6 flex items-center justify-between gap-6 space-x-2', { 'bg-green-50/75': todo.is_completed }]">
         <div class="flex-1 space-y-1">
             <div class="text-lg text-gray-900 font-semibold">
                 {{ todo.name }}
@@ -40,8 +47,8 @@ function handleMarkCompleted(id) {
         </div>
 
         <div class="flex-none">
-            <div v-if="todo.is_completed" class="text-green-600">
-                &check; Completed
+            <div v-if="todo.is_completed" class="text-sm text-green-600 font-semibold uppercase">
+                Completed
             </div>
             <div v-else class="flex items-center gap-2">
                 <Link
@@ -53,11 +60,40 @@ function handleMarkCompleted(id) {
                 </Link>
 
                 <PrimaryButton
-                    :disabled="markCompletedForm.processing"
-                    @click="handleMarkCompleted(todo.id)"
+                    type="button"
+                    @click="showingMarkCompletedConfirmationModal = true"
                 >
                     Mark Completed
                 </PrimaryButton>
+
+                <Modal
+                    :show="showingMarkCompletedConfirmationModal"
+                    @close="showingMarkCompletedConfirmationModal = false"
+                >
+                    <div class="p-6">
+                        <h2 class="text-lg font-medium text-gray-900">
+                            Are you sure you want to mark this todo completed?
+                        </h2>
+
+                        <div class="mt-6 flex justify-end gap-3">
+                            <SecondaryButton
+                                type="button"
+                                @click="showingMarkCompletedConfirmationModal = false"
+                            >
+                                Cancel
+                            </SecondaryButton>
+
+                            <PrimaryButton
+                                type="button"
+                                :class="{ 'opacity-25': markCompletedForm.processing }"
+                                :disabled="markCompletedForm.processing"
+                                @click="handleMarkCompleted(todo.id)"
+                            >
+                                Mark Completed
+                            </PrimaryButton>
+                        </div>
+                    </div>
+                </Modal>
             </div>
         </div>
     </div>
